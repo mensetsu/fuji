@@ -1,0 +1,110 @@
+'Mt Fuji' Coding Challenge
+
+Build an IP address blacklist service.
+
+The objective of the blacklist service is to prevent a malicious or broken
+client from flooding an API with failed requests. Clients are identified and
+blocked based on the IP address.
+
+This service works with a 'rolling window', hard-coded to five minutes, and
+a bad request threshold, set to twenty requests.
+
+If a client crosses the threshold within the rolling window, by sending
+twenty bad requests within the threshold, they are considered blacklisted.
+
+When a client is blacklisted, they must make no further requests for a blacklist
+duration, coincidentally set to the same value of the threshold, five
+minutes. If they do send a failed request in this time, then the blacklist is
+renewed and the duration restarted.
+
+Finally, our operations department wants to be able to see who is on
+the blacklist. We will need to call the blacklist service to see who is the 'top
+offenders' on the blacklist, so they can look upon them with disapproval.
+
+The service is used in a multi-threaded environment, so you want to consider
+thread safety in all the relevant operations.
+
+There are two assignments to solve, the second one is optional. 
+
+Your code should be unit tested and the use of third party libraries is allowed.
+
+We care more about how you reason through your design decisions and coding,
+the assumptions and constraints, not the formalities. However, you are expected
+to participate in architectural-level design discussions. Through your code
+and documents, we'd like to see your thinking process, your capability to
+start with vaguely defined problems, define your scope, articulate your ideas,
+argue for your decisions (you will be challenged on your decisions during an
+onsite interview), listen to opposing opinions and reach a consensus with your
+future colleagues.
+
+Assignment 1:
+
+Keep track of failure counters of IP addresses and check if a given IP address
+is blacklisted in a multi-threaded environment. Imagine you have an API node
+in AWS cloud. You want to keep track of how many access denied failures
+are triggered by different source IP addresses within a time window. The
+failure counters of failed requests are kept in memory within rolling time
+window, and support query if a given IP address is blacklisted at the moment.
+
+Implement the interface by filling out the stub implementation in the
+BlackListSvcImpl class. You can find this class in the src/ directory.
+
+Hint: Please only consider IPv4 addresses.
+
+Assignment 2 (optional):
+
+Now you can count the failures, what about queries like, the top 10 IP
+addresses that have the most failures within the current time window? How
+would you do it?
+
+Important:
+
+Please do not share this publicly. Send back via e-mail.
+
+========================================================
+Setup and Implementation Details
+========================================================
+
+++++++++++
+IDE setup:
+++++++++++
+
+I've made use of the Lombok Project to keep the code clean and concise as possible.
+The lombok dependency has been added to the pom, so the project will build in maven,
+but in order for the code to run in an IDE you must install lombok into your IDE,
+instructions are on their site (https://projectlombok.org); for example, eclipse
+install instructions are here: https://projectlombok.org/setup/eclipse.
+
++++++++++++++++++
+Design Decisions:
++++++++++++++++++
+
+Overview:
+
+The BlackListSvcImpl stores ips and tracking information for each ip in a ConcurrentMap.
+
+The Tracking object holds the blacklist end time (to determine when it will be 
+unblacklisted) as well as individual lists for requests and blacklist violations.
+The lists contain the epoch seconds/time of the request.  In order to 
+implement the rolling window, these lists are removed of old/expired entries after
+data is added and when counts are requested.  Write operations are synchronized against
+the lists for thread-safety, while still allowing write operations to the different
+lists to occur simultaneously. 
+
+In order to keep memory in check, a clean up thread is started in the BlackList.
+It will attempt to clean up old entries from Tracking lists and prune the entry from
+the ip db if there haven't been any requests during the current window. 
+
+Validation:
+
+I didn't validate any of the ip parameters as it wasn't clear if throwing an 
+IllegalArgumentException and potentially stopping the service would be acceptable.
+
+getTopN:
+
+I've assumed that this method won't be called too frequently so I implemented it where
+it will process the entire ip database to come up with the topN map each time. If performance
+is an issue, I would do the processing possibly in the cleanup thread and cache the results
+for the clean up interval (the time between cleanup thread runs).
+
+
